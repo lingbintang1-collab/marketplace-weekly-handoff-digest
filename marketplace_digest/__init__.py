@@ -1,0 +1,1 @@
+"""Scheduled marketplace digest service."""

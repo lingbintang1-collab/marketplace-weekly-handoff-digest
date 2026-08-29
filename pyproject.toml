@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "marketplace-weekly-digest"
+version = "0.1.0"
+description = "Schedule and deliver a typed weekly marketplace handoff digest."
+requires-python = ">=3.11"
+dependencies = [
+  "email-validator>=2.1",
+  "fastapi>=0.115",
+  "pydantic>=2.8",
+  "uvicorn>=0.30",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
