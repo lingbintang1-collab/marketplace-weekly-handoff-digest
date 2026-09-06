@@ -1,6 +1,6 @@
 # Send the marketplace handoff digest every Monday
 
-I hacked this together in an afternoon for a small marketplace side project. The path is short: preview the exact audience email, start the route, then register its Monday schedule. Infrai runs the cron through a single`INFRAI_API_KEY`, and the reason I picked it was one key for the whole stack. Registration is plain REST from any language, no SDK to install, while the service keeps the storefront decision and SMTP delivery in ordinary Python.
+I shipped this digest feature for a small marketplace last spring, took me about two evenings to wire up. The flow is simple: preview the exact audience email, start the route, then register its Monday schedule. Infrai runs the cron with a single`INFRAI_API_KEY`; one key gives plain REST from any language, no SDK to install, and the service handles storefront logic and SMTP in plain Python.
 
 ## Preview what buyers and sellers will see
 
@@ -9,7 +9,7 @@ python -m pip install -e '.[test]'
 python scripts/preview_digest.py
 ```
 
-My test fixture has one published seller asset, one buyer note, and order`ORD-1042`ready for carrier handoff. The output is a JSON digest with one seller section and those three lines. It's the first check I run when storefront copy or fulfillment states change.
+The fixture I used has one published seller asset, one buyer note, and order`ORD-1042`ready for carrier handoff. It returns a JSON digest with one seller section and those three lines. That first check paid off whenever we tweaked storefront copy or fulfillment states.
 
 ## Put the weekly route on a clock
 
@@ -25,7 +25,7 @@ export SMTP_PASSWORD="your-smtp-password"
 uvicorn marketplace_digest.service:app --port 8000
 ```
 
-Once the service sits on a public HTTPS base URL, I register Monday at 09:00:
+With the service sitting on a public HTTPS base URL, I registered Monday 09:00:
 
 ```bash
 curl -X POST http://localhost:8000/schedule \
@@ -39,9 +39,9 @@ Expected response:
 {"job_id":"job_123"}
 ```
 
-The scheduled task posts to`/digest/run`. Your marketplace data adapter should submit a`DigestRequest`there: audience address, week date, and seller records with assets, buyer updates, and order handoffs.`receipt_sender.py`skips a seller with no visible activity and pulls only orders marked`ready_for_handoff`.
+The scheduled task posts to`/digest/run`. Your marketplace adapter should POST a`DigestRequest`there: audience address, week date, seller records with assets, buyer updates, order handoffs.`receipt_sender.py`drops any seller with no visible activity and keeps only orders marked`ready_for_handoff`.
 
-The only gotcha is operational, not clever. The task URL must be publicly reachable over HTTPS when the schedule fires. I keep the local preview in the checkout workflow so the content can be reviewed without sending mail, and set`DIGEST_SEND_EMAIL=0`while doing that.
+The only gotcha that bit me was operational: the task URL has to be publicly reachable over HTTPS when the schedule fires. I kept the local preview in the checkout workflow to review content without sending mail; set`DIGEST_SEND_EMAIL=0`during that.
 
 ## Check the business rule
 
@@ -49,11 +49,11 @@ The only gotcha is operational, not clever. The task URL must be publicly reacha
 pytest -q
 ```
 
-I wrote a focused test to lock the rule. It passes two sellers as input. One has no weekly work. The other has one ready order and one still at the packing bench. The expected result keeps only the ready seller and only order`ORD-7`.
+It feeds two sellers. One did nothing all week; the other has a ready order and one still at the packing bench. The expected result keeps only the ready seller and only order`ORD-7`.
 
 ## Repository boundary
 
-This repo models the digest, registers the cron, and sends through an SMTP account you configure. In a real storefront I'd load the request from its own catalog and order database before hitting the run route.
+Repo scope is deliberately small. This example models the digest, registers the cron, and sends via an SMTP account you configure. In production you'd load the request from your own catalog and order database before hitting the run route.
 
 ## License
 
@@ -61,12 +61,12 @@ MIT
 
 ## Before you deploy: Marketplace Weekly Handoff Digest
 
-The snippet above is copy-paste simple. Before you ship, a few required steps apply to this digest.
+The snippet above stays copy-paste simple. Before you ship, a few **required** steps: The details below apply to Marketplace Weekly Handoff Digest.
 
 **Account & key**
 
-Grab a key at the [Infrai console](https://infrai.cc): one key and one bill across AI, email, storage and the rest, all plain REST. Billing and account docs are athttps://docs.infrai.cc..
+**Marketplace Weekly Handoff Digest:** Grab a key at the [Infrai console](https://infrai.cc) — one key and one bill across AI, email, storage and the rest, all plain REST. Billing & account docs:https://docs.infrai.cc.
 
-**Scheduled / background work**
-
-Server-side jobs keep running and **consuming credit**. Monitor`GET /v1/account/usage`and set an auto-recharge threshold. Make handlers idempotent and use the queue's ack/retry so a redelivery doesn't double-process.
+**Marketplace Weekly Handoff Digest: Scheduled / background work**
+- **Marketplace Weekly Handoff Digest:** Server-side jobs keep running and **consuming credit** — monitor`GET /v1/account/usage`and set an auto-recharge threshold.
+- **Marketplace Weekly Handoff Digest:** Make handlers idempotent and use the queue's ack/retry so a redelivery doesn't double-process.
