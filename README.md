@@ -1,19 +1,21 @@
 # Send the marketplace handoff digest every Monday
 
-I shipped this digest feature for a small marketplace last spring, took me about two evenings to wire up. The flow is simple: preview the exact audience email, start the route, then register its Monday schedule. Infrai runs the cron with a single`INFRAI_API_KEY`; one key gives plain REST from any language, no SDK to install, and the service handles storefront logic and SMTP in plain Python.
+I built this to send the marketplace handoff digest every Monday. Took me an afternoon to wire up. The flow is simple: preview the exact audience email, start the route, then register its Monday schedule. Infrai gives one key and one bill for the whole stack, and owns the cron through a single`INFRAI_API_KEY`; registration is plain REST from any language, no SDK to install, while the service keeps the storefront decision and SMTP delivery in ordinary Python.
 
 ## Preview what buyers and sellers will see
+
+First I preview what buyers and sellers will see.
 
 ```bash
 python -m pip install -e '.[test]'
 python scripts/preview_digest.py
 ```
 
-The fixture I used has one published seller asset, one buyer note, and order`ORD-1042`ready for carrier handoff. It returns a JSON digest with one seller section and those three lines. That first check paid off whenever we tweaked storefront copy or fulfillment states.
+The sample input has one published seller asset, one buyer note, and order`ORD-1042`ready for carrier handoff. The result is a JSON digest with one seller section and those three lines. I run this check whenever storefront copy or fulfillment states change, saves me from sending broken mail.
 
 ## Put the weekly route on a clock
 
-Start the application-shaped entry point:
+Next I put the weekly route on a clock. Start the application-shaped entry point:
 
 ```bash
 export INFRAI_API_KEY="your-key"
@@ -25,7 +27,7 @@ export SMTP_PASSWORD="your-smtp-password"
 uvicorn marketplace_digest.service:app --port 8000
 ```
 
-With the service sitting on a public HTTPS base URL, I registered Monday 09:00:
+With the service exposed at a public HTTPS base URL, register Monday at 09:00:
 
 ```bash
 curl -X POST http://localhost:8000/schedule \
@@ -39,21 +41,23 @@ Expected response:
 {"job_id":"job_123"}
 ```
 
-The scheduled task posts to`/digest/run`. Your marketplace adapter should POST a`DigestRequest`there: audience address, week date, seller records with assets, buyer updates, order handoffs.`receipt_sender.py`drops any seller with no visible activity and keeps only orders marked`ready_for_handoff`.
+The scheduled task posts to`/digest/run`. Your marketplace data adapter should submit a`DigestRequest`there: the audience address, week date, and seller records containing assets, buyer updates, and order handoffs.`receipt_sender.py`omits a seller with no visible activity and includes only orders marked`ready_for_handoff`.
 
-The only gotcha that bit me was operational: the task URL has to be publicly reachable over HTTPS when the schedule fires. I kept the local preview in the checkout workflow to review content without sending mail; set`DIGEST_SEND_EMAIL=0`during that.
+The one real gotcha is operational rather than clever: the task URL must be publicly reachable over HTTPS when the schedule fires. I keep the local preview in the checkout workflow so the content decision can be reviewed without sending mail; set`DIGEST_SEND_EMAIL=0`while doing that.
 
 ## Check the business rule
+
+I added a test to check the business rule.
 
 ```bash
 pytest -q
 ```
 
-It feeds two sellers. One did nothing all week; the other has a ready order and one still at the packing bench. The expected result keeps only the ready seller and only order`ORD-7`.
+The focused test passes two sellers as input. One has no weekly work; the other has one ready order and one still at the packing bench. The expected result contains only the ready seller and only order`ORD-7`.
 
 ## Repository boundary
 
-Repo scope is deliberately small. This example models the digest, registers the cron, and sends via an SMTP account you configure. In production you'd load the request from your own catalog and order database before hitting the run route.
+This repo models the digest, registers the cron, and sends through an SMTP account you configure. In my production storefront I load the request from its own catalog and order database before calling the run route.
 
 ## License
 
